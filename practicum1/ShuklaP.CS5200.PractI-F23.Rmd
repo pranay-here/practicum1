@@ -1,0 +1,67 @@
+---
+title: "Practicum I CS5200"
+output: html_notebook
+author: "Pranay Shukla"
+date: "Fall 2023"
+---
+
+#Installing all required packages
+```{r}
+library(RMySQL)
+library(sqldf)
+options(sqldf.driver = "SQLite")
+library(dplyr)
+library(ggplot2)
+```
+
+## connect to the database
+```{r connectToDatabase}
+dbcon <- dbConnect(MySQL(), 
+                user = "sql9655222", 
+                password = "nhkVyZ5Hgy", 
+                dbname = "sql9655222", 
+                host = "sql9.freemysqlhosting.net")
+```
+
+# Checking the databases present
+```{sql connection=dbcon}
+SHOW DATABASES
+
+```
+
+# Using the DB 
+```{sql connection=dbcon}
+USE sql9655222
+```
+# Dropping tables if already exists
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS flights
+```
+
+#```{sql connection=dbcon}
+#DROP TABLE IF EXISTS airports
+#```
+#
+#```{sql connection=dbcon}
+#DROP TABLE IF EXISTS conditions
+#```
+
+# Query - 1
+# Creating table airports that stores the aid, airportName, airportCode and state
+flights (fid : integer,
+            date : date, origin : integer,
+            airline : text, aircraft : text,
+            altitude : integer, heavy: boolean)
+```{sql connection=dbcon}
+CREATE TABLE flights (
+    fid INTEGER PRIMARY KEY,
+    date DATE,
+    origin INTEGER,
+    airline TEXT,
+    aircraft TEXT,
+    altitude INTEGER CHECK (altitude >= 0),
+    heavy BOOLEAN
+);
+
+```
