@@ -54,7 +54,7 @@ DROP TABLE IF EXISTS strikes
 
 
 # Query - 1
-# Creating table airports that stores the aid, airportName, airportCode and state
+# Creating table flights and checking altitude has only positive values
 
 ```{sql connection=dbcon}
 CREATE TABLE flights (
@@ -69,11 +69,7 @@ CREATE TABLE flights (
 
 ```
 
-(5 pts / 0.5 hrs) Create a table that stores airports and states called airports and that follows this schema:
-
-airports (aid : integer, airportName : text, airportState : text, airportCode : text) 
-
-aid is a synthetic primary key, airportName is the name of the airport and is from the airport column in the CSV, airportState corresponds to the airport state (the origin column) from the data file. The airportCode should be the airport's international code, e.g., BOS for Boston or LGA for LaGuardia. However, you may leave it empty for this database -- it is for future expansion.
+# creating table airports
 
 ```{sql connection=dbcon}
 CREATE TABLE airports(
@@ -86,14 +82,14 @@ PRIMARY KEY(aid)
 
 ```
 
-Link the flights and airports tables via the origin foreign key in flights to the primary key aid in airports. The origin is an FK to the airport in the airports table. Update the above table definitions for airports and flights as necessary.
+# customising flights to have foreign key
 
 ```{sql connection=dbcon}
 ALTER TABLE flights
 ADD CONSTRAINT fk_origin_airports
 FOREIGN KEY (origin) REFERENCES airports (aid);
 ```
-# Task 1 - D
+
 # Creating a lookup table conditions which stores the cid, condition and explanation
 
 ```{sql connection=dbcon}
@@ -106,12 +102,8 @@ PRIMARY KEY(cid)
 ```
 
 
-(4 pts / 0.5 hrs) Create a table that stores bird strikes called strikes and that follows this schema:
 
-strikes (sid : integer, fid : integer, numbirds : integer, impact : text, damage : boolean, altitude : integer ≥ 0, conditions : {...}) 
-
-sid is a synthetic key. fid is a foreign key for the flight for which this strike occurred for. If there's more than one strike, then simplify by only tracking the first strike. The conditions column is a foreign key link to the conditions lookup table. The column damage should be TRUE if there was damage, FALSE otherwise. The other columns are directly from the CSV.
-
+# creating strikes
 ```{sql connection=dbcon}
 
 CREATE TABLE strikes (
@@ -127,15 +119,6 @@ CREATE TABLE strikes (
 );
 ```
 
-TODO : G (2 pts / 0.3 hrs) Add one or more code chunks that are not evaluated (eval = F) when the Notebook is knitted but can be used to test your table definitions. Add whatever test code you need to assure yourself that your table definitions are correct.
-
-5
-
-f you haven't yet, download the bird strikes CSV data file from the link provided before. Place the Bird Strikes CSV file into the same folder as your R Notebook and the load it into a dataframe called bds.raw. Do not use a path name when loading. The default path is the local folder that contains the R Notebook when you have the R Notebook in an R Project.
-
-
-
-# Query - 2
 # Loading the CSV file into R without filepath
 
 ```{r}
@@ -143,7 +126,7 @@ fn <- "BirdStrikesData-V2.csv"
 bds.raw <- read.csv(fn, header = TRUE, stringsAsFactors = FALSE)
 ```
 
-
+# checking if we got the csvFile
 ```{r}
 bds.raw
 ```
@@ -158,7 +141,7 @@ bds.raw
 
 
 
- Using the table definitions and the data in the dataframe bds.raw from above, populate the tables with the data from the appropriate columns. Omit any columns from the CSV that are not referenced in the tables. You do not need to create any additional tables. Because we are not adding additional tables there will be (unnormalized) data and repetitions, for example for aircraft -- that is acceptable for this practicum due to time constraints but would not be if this were an actual analytics database project. Assume "Business" to be an airline name (it is actually a private flight but we assume it is the airline called "Business") and store those incidents.
+#populating the empty fields with unknown..
  
 ```{r}
 options(warn = -1) 
@@ -176,7 +159,8 @@ cond_df <-data.frame(sky_condition= unique(bds.raw$sky_conditions))
 cond_df <- cbind(cid = 1:nrow(cond_df), cond_df) 
 cond_df
 ```
-# Creating a dataframe for airports
+# Creating a dataframe for airports, we add rid now to populate aid in flights
+# later
 
 ```{r}
 airport_df <- data.frame(airportName=bds.raw$airport,airportState=bds.raw$origin)
@@ -197,7 +181,8 @@ strikes_df <- data.frame(`rid` = bds.raw$rid,
 strikes_df <- cbind(sid = 1:nrow(strikes_df), strikes_df) 
 strikes_df
 ```
-# creating the flights dataframe
+# creating the flights dataframe, we use rid to reference data in airports to 
+# populate the field aid
 ```{r}
 flights_df <- data.frame(`rid` = bds.raw$rid,
   date = bds.raw$flight_date,
@@ -208,15 +193,15 @@ flights_df <- data.frame(`rid` = bds.raw$rid,
                            heavy = bds.raw$heavy_flag)
 flights_df <- cbind(fid = 1:nrow(flights_df), flights_df) 
 ```
-#converting to datetime object
+```{r}
+flights_df
+```
+#converting the date to datetime object
 
 ```{r}
 flights_df$`date` <- as.Date(flights_df$`date`, format = "%m/%d/%Y")
 flights_df
 ```
-
-
-
 
 # Checking null values for each column
 ```{r}
@@ -228,13 +213,13 @@ sapply(flights_df, function(x) sum(is.na(x)))
 
 
 
-# Omitting the null values from incidents dataframe
+# Omitting the null values from flights dataframe
 ```{r}
 flights_df <- na.omit(flights_df) 
 flights_df
 ```
 
-# Checking null values for each column 
+# Checking again for null values in each column
 ```{r}
 
 sapply(flights_df, function(x) sum(is.na(x)))
@@ -242,17 +227,64 @@ sapply(flights_df, function(x) sum(is.na(x)))
 ```
 
 
-
 # Replacing the origin in flights table with unique id (aid) from airports dataframe
 ```{r}
-flights_df <- sqldf("SELECT fid,rid,`date`,airline,aircraft, altitude, heavy, aid AS origin FROM flights_df
+flights_df <- sqldf("SELECT fid,flights_df.rid,`date`,airline,aircraft, altitude, heavy, aid AS origin FROM flights_df
 JOIN airport_df ON flights_df.origin = airport_df.airportState")
+
+```
+```{r}
+flights_df
+```
+
+```{r}
+num_rows <- nrow(flights_df)
+
+# Create a vector with values from 1 to the number of rows
+new_fid <- 1:num_rows
+
+# Assign the new_fid vector to the fid column in flights_df
+flights_df$fid <- new_fid
+
 
 flights_df
 ```
 
 
+#```{r}
+#flights_df <- sqldf("SELECT f.fid,f.rid,f.`date`,f.airline,f.aircraft, f.altitude, f.heavy, a.aid AS origin 
+#FROM flights_df f
+#JOIN airport_df a ON f.rid = a.rid")
+
+#flights_df
+#```
+# changing fid in strikes to fid from flights
+
+# changing fid in strikes to flights' fid
+```{r}
+strikes_df <- sqldf("
+  SELECT s.sid, s.rid, f.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
+  FROM strikes_df s
+  LEFT JOIN flights_df f ON s.rid = f.rid
+")
+```
+
+```{r}
+num_rows <- nrow(strikes_df)
+
+# Create a vector with values from 1 to the number of rows
+new_sid <- 1:num_rows
+
+# Assign the new_fid vector to the sid column in s
+strikes_df$sid <- new_sid
+strikes_df
+```
+
+
+
+
 # Writing the airports dataframe to airports table
+
 
 ```{r}
 dbWriteTable(dbcon, "airports", airport_df[1:nrow(airport_df),], row.names = FALSE, append = TRUE)
@@ -280,22 +312,7 @@ strikes_df
 
 
 
-
-
-
-
-# changing fid to fid from flights
-
-
-```{r}
-strikes_df <- sqldf("
-  SELECT s.sid, s.rid, f.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
-  FROM strikes_df s
-  LEFT JOIN flights_df f ON s.rid = f.rid
-")
-```
-
-# removing rid
+# removing rid from strikes
 
 ```{r}
 strikes_df <- sqldf("SELECT s.sid, s.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
@@ -330,14 +347,14 @@ dbWriteTable(dbcon, "flights", flights_df[1:nrow(flights_df),], row.names = FALS
 
 
 
-
+# checking if the data has been populated properly
 
 ```{sql connection = dbcon}
-SELECT * from conditions
+SELECT * from conditions LIMIT 2
 ```
 
 ```{sql connection = dbcon}
-SELECT * from airports
+SELECT * from airports LIMIT 19
 ```
 ```{sql connection = dbcon}
 SELECT * from flights LIMIT 7
