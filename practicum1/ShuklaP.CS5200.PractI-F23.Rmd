@@ -36,7 +36,7 @@ USE sql9655222
 # Dropping tables if already exists
 
 ```{sql connection=dbcon}
-DROP TABLE IF EXISTS flights
+DROP TABLE IF EXISTS airports
 ```
 
 #```{sql connection=dbcon}
@@ -65,3 +65,306 @@ CREATE TABLE flights (
 );
 
 ```
+
+(5 pts / 0.5 hrs) Create a table that stores airports and states called airports and that follows this schema:
+
+airports (aid : integer, airportName : text, airportState : text, airportCode : text) 
+
+aid is a synthetic primary key, airportName is the name of the airport and is from the airport column in the CSV, airportState corresponds to the airport state (the origin column) from the data file. The airportCode should be the airport's international code, e.g., BOS for Boston or LGA for LaGuardia. However, you may leave it empty for this database -- it is for future expansion.
+
+```{sql connection=dbcon}
+CREATE TABLE airports(
+aid INTEGER NOT NULL AUTO_INCREMENT, 
+airportName TEXT NOT NULL, 
+airportCode TEXT , 
+airportState TEXT NOT NULL,
+PRIMARY KEY(aid)
+)
+
+```
+
+Link the flights and airports tables via the origin foreign key in flights to the primary key aid in airports. The origin is an FK to the airport in the airports table. Update the above table definitions for airports and flights as necessary.
+
+```{sql connection=dbcon}
+ALTER TABLE flights
+ADD CONSTRAINT fk_origin_airports
+FOREIGN KEY (origin) REFERENCES airports (aid);
+```
+# Task 1 - D
+# Creating a lookup table conditions which stores the cid, condition and explanation
+
+```{sql connection=dbcon}
+CREATE TABLE conditions(
+cid INTEGER NOT NULL AUTO_INCREMENT, 
+`sky_condition` TEXT NOT NULL, 
+explanation TEXT,
+PRIMARY KEY(cid)
+)
+```
+```{sql connection=dbcon}
+conditions
+)
+```
+
+(4 pts / 0.5 hrs) Create a table that stores bird strikes called strikes and that follows this schema:
+
+strikes (sid : integer, fid : integer, numbirds : integer, impact : text, damage : boolean, altitude : integer ≥ 0, conditions : {...}) 
+
+sid is a synthetic key. fid is a foreign key for the flight for which this strike occurred for. If there's more than one strike, then simplify by only tracking the first strike. The conditions column is a foreign key link to the conditions lookup table. The column damage should be TRUE if there was damage, FALSE otherwise. The other columns are directly from the CSV.
+
+```{sql connection=dbcon}
+
+CREATE TABLE strikes (
+    sid INTEGER PRIMARY KEY,
+    fid INTEGER,
+    numbirds INTEGER,
+    impact TEXT,
+    damage BOOLEAN,
+    altitude INTEGER CHECK (altitude >= 0),
+    conditions INTEGER,
+    FOREIGN KEY (fid) REFERENCES flights (fid),
+    FOREIGN KEY (conditions) REFERENCES conditions (cid)
+);
+```
+
+TODO : G (2 pts / 0.3 hrs) Add one or more code chunks that are not evaluated (eval = F) when the Notebook is knitted but can be used to test your table definitions. Add whatever test code you need to assure yourself that your table definitions are correct.
+
+5
+
+f you haven't yet, download the bird strikes CSV data file from the link provided before. Place the Bird Strikes CSV file into the same folder as your R Notebook and the load it into a dataframe called bds.raw. Do not use a path name when loading. The default path is the local folder that contains the R Notebook when you have the R Notebook in an R Project.
+
+
+
+# Query - 2
+# Loading the CSV file into R without filepath
+
+```{r}
+fn <- "BirdStrikesData-V2.csv"
+bds.raw <- read.csv(fn, header = TRUE, stringsAsFactors = FALSE)
+```
+
+
+```{r}
+bds.raw
+```
+
+ Using the table definitions and the data in the dataframe bds.raw from above, populate the tables with the data from the appropriate columns. Omit any columns from the CSV that are not referenced in the tables. You do not need to create any additional tables. Because we are not adding additional tables there will be (unnormalized) data and repetitions, for example for aircraft -- that is acceptable for this practicum due to time constraints but would not be if this were an actual analytics database project. Assume "Business" to be an airline name (it is actually a private flight but we assume it is the airline called "Business") and store those incidents.
+ 
+```{r}
+options(warn = -1) 
+bds.raw$airline[bds.raw$airline == ""] <- "Unknown"
+```
+
+```{r}
+options(warn = -1) 
+bds.raw$airline[bds.raw$airport == ""] <- "Unknown"
+```
+
+# Creating a dataframe for conditions
+```{r}
+cond_df <-data.frame(sky_condition= unique(bds.raw$sky_conditions))
+cond_df <- cbind(cid = 1:nrow(cond_df), cond_df) 
+cond_df
+```
+# Creating a dataframe for airports
+
+```{r}
+airport_df <- data.frame(airportName=bds.raw$airport,airportState=bds.raw$origin)
+#removing duplicates
+airport_df <- airport_df %>% distinct()
+airport_df <- cbind(aid = 1:nrow(airport_df), airport_df) 
+airport_df
+```
+# Creating a strikes dataframe
+```{r}
+strikes_df <- data.frame(`rid` = bds.raw$rid,
+  numbirds = bds.raw$wildlife_struck,
+                           impact = bds.raw$impact,
+                           damage=bds.raw$damage,
+                           altitude = bds.raw$altitude_ft, 
+                           conditions = bds.raw$sky_conditions,
+                         fid = 0)
+strikes_df <- cbind(sid = 1:nrow(strikes_df), strikes_df) 
+strikes_df
+```
+# creating the flights dataframe
+```{r}
+flights_df <- data.frame(`rid` = bds.raw$rid,
+  date = bds.raw$flight_date,
+                           origin = bds.raw$origin,
+                           airline=bds.raw$airline,
+                           aircraft = bds.raw$aircraft, 
+                           altitude = bds.raw$altitude_ft,
+                           heavy = bds.raw$heavy_flag)
+flights_df <- cbind(fid = 1:nrow(flights_df), flights_df) 
+```
+#converting to datetime object
+
+```{r}
+flights_df$`date` <- as.Date(flights_df$`date`, format = "%m/%d/%Y")
+flights_df
+```
+
+
+
+
+# Checking null values for each column
+```{r}
+
+sapply(flights_df, function(x) sum(is.na(x)))
+
+```
+
+
+
+
+# Omitting the null values from incidents dataframe
+```{r}
+flights_df <- na.omit(flights_df) 
+flights_df
+```
+
+# Checking null values for each column 
+```{r}
+
+sapply(flights_df, function(x) sum(is.na(x)))
+
+```
+
+
+
+# Replacing the origin in flights table with unique id (aid) from airports dataframe
+```{r}
+flights_df <- sqldf("SELECT fid,rid,`date`,airline,aircraft, altitude, heavy, aid AS origin FROM flights_df
+JOIN airport_df ON flights_df.origin = airport_df.airportState")
+
+flights_df
+```
+
+
+# Writing the airports dataframe to airports table
+
+```{r}
+dbWriteTable(dbcon, "airports", airport_df[1:nrow(airport_df),], row.names = FALSE, append = TRUE)
+```
+
+
+
+#writing all the dataframes to tables
+
+```{r}
+dbWriteTable(dbcon, "conditions", cond_df[1:nrow(cond_df),], row.names = FALSE, append = TRUE)
+```
+
+
+
+
+# replacing conditions with condition id
+
+```{r}
+strikes_df <- sqldf("SELECT `rid`,sid,fid,numbirds,impact,damage,altitude,cid
+AS conditions FROM strikes_df
+JOIN cond_df ON strikes_df.conditions = cond_df.sky_condition")
+strikes_df
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+strikes_df <- sqldf("
+  SELECT s.sid, s.rid, f.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
+  FROM strikes_df s
+  LEFT JOIN flights_df f ON s.rid = f.rid
+")
+```
+
+```{r}
+strikes_df <- sqldf("SELECT s.sid, s.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
+  FROM strikes_df s")
+```
+
+```{r}
+strikes_df
+```
+
+
+
+
+# populating the strikes table:- 
+```{r}
+dbWriteTable(dbcon, "strikes", strikes_df[1:nrow(strikes_df),], row.names = FALSE, append = TRUE)
+```
+
+# removing rid
+
+```{r}
+flights_df <- sqldf("SELECT fid,`date`,airline,aircraft, altitude, heavy, origin from flights_df")
+```
+```{r}
+flights_df
+```
+#populating the flights table
+
+```{r}
+dbWriteTable(dbcon, "flights", flights_df[1:nrow(flights_df),], row.names = FALSE, append = TRUE)
+```
+
+
+
+
+
+```{sql connection = dbcon}
+SELECT * from conditions
+```
+
+```{sql connection = dbcon}
+SELECT * from airports
+```
+```{sql connection = dbcon}
+SELECT * from flights LIMIT 7
+```
+
+```{sql connection = dbcon}
+SELECT * from strikes LIMIT 17
+```
+
+```{sql connection=dbcon}
+SELECT a.airportState, COUNT(s.sid) AS num_incidents
+FROM strikes AS s
+JOIN flights AS f ON s.fid = f.fid
+JOIN airports AS a ON f.origin = a.aid
+GROUP BY a.airportState
+ORDER BY num_incidents DESC
+LIMIT 10;
+
+```
+
+```{sql connection=dbcon}
+SELECT f.airline, COUNT(s.sid) AS num_incidents
+FROM strikes AS s
+JOIN flights AS f ON s.fid = f.fid
+GROUP BY f.airline
+HAVING num_incidents > (SELECT AVG(num_incidents) FROM (SELECT f.airline, COUNT(s.sid) AS num_incidents FROM strikes AS s JOIN flights AS f ON s.fid = f.fid GROUP BY f.airline) AS avg_table);
+
+```
+```{r}
+query <- sqldf("SELECT DATE_FORMAT(s.incident_date, '%Y-%m') AS month, SUM(s.numbirds) AS total_birds
+          FROM strikes s
+          GROUP BY month
+          ORDER BY month")
+
+# Execute the SQL query and save the result in a dataframe
+bird_strikes_by_month <- dbGetQuery(dbcon, query)
+
+
+# Display the first six rows of the dataframe
+head(bird_strikes_by_month)
+```
+
