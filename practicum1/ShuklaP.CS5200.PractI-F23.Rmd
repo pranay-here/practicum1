@@ -17,9 +17,9 @@ library(ggplot2)
 ## connect to the database
 ```{r connectToDatabase}
 dbcon <- dbConnect(MySQL(), 
-                user = "sql9655222", 
-                password = "nhkVyZ5Hgy", 
-                dbname = "sql9655222", 
+                user = "sql9656327", 
+                password = "9f6LlZGTqu", 
+                dbname = "sql9656327", 
                 host = "sql9.freemysqlhosting.net")
 ```
 
@@ -31,7 +31,7 @@ SHOW DATABASES
 
 # Using the DB 
 ```{sql connection=dbcon}
-USE sql9655222
+USE sql9656327
 ```
 # Dropping tables if already exists
 
@@ -39,20 +39,23 @@ USE sql9655222
 DROP TABLE IF EXISTS airports
 ```
 
-#```{sql connection=dbcon}
-#DROP TABLE IF EXISTS airports
-#```
-#
-#```{sql connection=dbcon}
-#DROP TABLE IF EXISTS conditions
-#```
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS flights
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS conditions
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS strikes
+```
+
+
 
 # Query - 1
 # Creating table airports that stores the aid, airportName, airportCode and state
-flights (fid : integer,
-            date : date, origin : integer,
-            airline : text, aircraft : text,
-            altitude : integer, heavy: boolean)
+
 ```{sql connection=dbcon}
 CREATE TABLE flights (
     fid INTEGER PRIMARY KEY,
@@ -101,10 +104,7 @@ explanation TEXT,
 PRIMARY KEY(cid)
 )
 ```
-```{sql connection=dbcon}
-conditions
-)
-```
+
 
 (4 pts / 0.5 hrs) Create a table that stores bird strikes called strikes and that follows this schema:
 
@@ -147,6 +147,16 @@ bds.raw <- read.csv(fn, header = TRUE, stringsAsFactors = FALSE)
 ```{r}
 bds.raw
 ```
+
+# we store Caused damage as true and No damage as false
+
+```{r}
+
+bds.raw$damage <- ifelse(bds.raw$damage == 'Caused damage', TRUE, FALSE)
+bds.raw
+```
+
+
 
  Using the table definitions and the data in the dataframe bds.raw from above, populate the tables with the data from the appropriate columns. Omit any columns from the CSV that are not referenced in the tables. You do not need to create any additional tables. Because we are not adding additional tables there will be (unnormalized) data and repetitions, for example for aircraft -- that is acceptable for this practicum due to time constraints but would not be if this were an actual analytics database project. Assume "Business" to be an airline name (it is actually a private flight but we assume it is the airline called "Business") and store those incidents.
  
@@ -250,7 +260,7 @@ dbWriteTable(dbcon, "airports", airport_df[1:nrow(airport_df),], row.names = FAL
 
 
 
-#writing all the dataframes to tables
+#writing conditions df to conditions
 
 ```{r}
 dbWriteTable(dbcon, "conditions", cond_df[1:nrow(cond_df),], row.names = FALSE, append = TRUE)
@@ -259,7 +269,7 @@ dbWriteTable(dbcon, "conditions", cond_df[1:nrow(cond_df),], row.names = FALSE, 
 
 
 
-# replacing conditions with condition id
+# replacing conditions with condition id in strikes df
 
 ```{r}
 strikes_df <- sqldf("SELECT `rid`,sid,fid,numbirds,impact,damage,altitude,cid
@@ -274,7 +284,7 @@ strikes_df
 
 
 
-
+# changing fid to fid from flights
 
 
 ```{r}
@@ -284,6 +294,8 @@ strikes_df <- sqldf("
   LEFT JOIN flights_df f ON s.rid = f.rid
 ")
 ```
+
+# removing rid
 
 ```{r}
 strikes_df <- sqldf("SELECT s.sid, s.fid, s.numbirds, s.impact, s.damage, s.altitude, s.conditions
@@ -302,7 +314,7 @@ strikes_df
 dbWriteTable(dbcon, "strikes", strikes_df[1:nrow(strikes_df),], row.names = FALSE, append = TRUE)
 ```
 
-# removing rid
+# removing rid from flights
 
 ```{r}
 flights_df <- sqldf("SELECT fid,`date`,airline,aircraft, altitude, heavy, origin from flights_df")
