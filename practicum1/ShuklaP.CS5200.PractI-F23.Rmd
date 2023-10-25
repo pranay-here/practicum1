@@ -1,12 +1,12 @@
 ---
 title: "Practicum I CS5200"
 output: html_notebook
-author: "Pranay Shukla"
+author: "Pranay Shukla and Deepthi Varanasi"
 date: "Fall 2023"
 ---
 
 #Installing all required packages
-```{r}
+```{r addingPackages, eval=T}
 library(RMySQL)
 library(sqldf)
 options(sqldf.driver = "SQLite")
@@ -15,39 +15,39 @@ library(ggplot2)
 ```
 
 ## connect to the database
-```{r connectToDatabase}
+```{r connectingToDatabase, eval=T }
 dbcon <- dbConnect(MySQL(), 
-                user = "sql9656327", 
-                password = "9f6LlZGTqu", 
-                dbname = "sql9656327", 
+                user = "sql9656433", 
+                password = "D3pzfkEWXg", 
+                dbname = "sql9656433", 
                 host = "sql9.freemysqlhosting.net")
 ```
 
 # Checking the databases present
-```{sql connection=dbcon}
+```{sql showDatabase, connection=dbcon}
 SHOW DATABASES
 
 ```
 
 # Using the DB 
-```{sql connection=dbcon}
-USE sql9656327
+```{sql usingDatabase, connection=dbcon}
+USE sql9656433
 ```
 # Dropping tables if already exists
 
-```{sql connection=dbcon}
+```{sql dropTableIfExist, connection=dbcon}
 DROP TABLE IF EXISTS airports
 ```
 
-```{sql connection=dbcon}
+```{sql dropTableIfExist, connection=dbcon}
 DROP TABLE IF EXISTS flights
 ```
 
-```{sql connection=dbcon}
+```{sql dropTableIfExists, connection=dbcon}
 DROP TABLE IF EXISTS conditions
 ```
 
-```{sql connection=dbcon}
+```{sql dropTableIfExists, connection=dbcon}
 DROP TABLE IF EXISTS strikes
 ```
 
@@ -56,7 +56,7 @@ DROP TABLE IF EXISTS strikes
 # Query - 1
 # Creating table flights and checking altitude has only positive values
 
-```{sql connection=dbcon}
+```{sql createFligts, connection=dbcon}
 CREATE TABLE flights (
     fid INTEGER PRIMARY KEY,
     date DATE,
@@ -71,7 +71,7 @@ CREATE TABLE flights (
 
 # creating table airports
 
-```{sql connection=dbcon}
+```{sql createAirport, connection=dbcon}
 CREATE TABLE airports(
 aid INTEGER NOT NULL AUTO_INCREMENT, 
 airportName TEXT NOT NULL, 
@@ -84,7 +84,7 @@ PRIMARY KEY(aid)
 
 # customising flights to have foreign key
 
-```{sql connection=dbcon}
+```{sql alterFlight, connection=dbcon}
 ALTER TABLE flights
 ADD CONSTRAINT fk_origin_airports
 FOREIGN KEY (origin) REFERENCES airports (aid);
@@ -92,7 +92,7 @@ FOREIGN KEY (origin) REFERENCES airports (aid);
 
 # Creating a lookup table conditions which stores the cid, condition and explanation
 
-```{sql connection=dbcon}
+```{sql lookUpTb, connection=dbcon}
 CREATE TABLE conditions(
 cid INTEGER NOT NULL AUTO_INCREMENT, 
 `sky_condition` TEXT NOT NULL, 
@@ -104,8 +104,8 @@ PRIMARY KEY(cid)
 
 
 # creating strikes
-```{sql connection=dbcon}
-
+# part f included adding fid as the foreign key
+```{sql strikesTabl, connection=dbcon}
 CREATE TABLE strikes (
     sid INTEGER PRIMARY KEY,
     fid INTEGER,
@@ -119,31 +119,37 @@ CREATE TABLE strikes (
 );
 ```
 
+
+# code to test table definitions
+
+
+
+
+
+
+
 # Loading the CSV file into R without filepath
 
-```{r}
+```{r loadingCSV, eval = T}
 fn <- "BirdStrikesData-V2.csv"
 bds.raw <- read.csv(fn, header = TRUE, stringsAsFactors = FALSE)
 ```
 
 # checking if we got the csvFile
-```{r}
+```{r printingCSV, eval = T}
 bds.raw
 ```
 
 # we store Caused damage as true and No damage as false
 
-```{r}
-
+```{r changeCauseDamageToTrueAndViceVersa, eval = T}
 bds.raw$damage <- ifelse(bds.raw$damage == 'Caused damage', TRUE, FALSE)
 bds.raw
 ```
 
-
-
 #populating the empty fields with unknown..
  
-```{r}
+```{r populatingTheEmptyRows, eval = T}
 options(warn = -1) 
 bds.raw$airline[bds.raw$airline == ""] <- "Unknown"
 ```
@@ -154,15 +160,14 @@ bds.raw$airline[bds.raw$airport == ""] <- "Unknown"
 ```
 
 # Creating a dataframe for conditions
-```{r}
+```{r dataframeCond, eval = T}
 cond_df <-data.frame(sky_condition= unique(bds.raw$sky_conditions))
 cond_df <- cbind(cid = 1:nrow(cond_df), cond_df) 
 cond_df
 ```
-# Creating a dataframe for airports, we add rid now to populate aid in flights
-# later
+# Creating a dataframe for airports
 
-```{r}
+```{r airportDataframe, eval = T}
 airport_df <- data.frame(airportName=bds.raw$airport,airportState=bds.raw$origin)
 #removing duplicates
 airport_df <- airport_df %>% distinct()
@@ -170,7 +175,7 @@ airport_df <- cbind(aid = 1:nrow(airport_df), airport_df)
 airport_df
 ```
 # Creating a strikes dataframe
-```{r}
+```{r dataframeStrikes, eval = T}
 strikes_df <- data.frame(`rid` = bds.raw$rid,
   numbirds = bds.raw$wildlife_struck,
                            impact = bds.raw$impact,
@@ -183,7 +188,7 @@ strikes_df
 ```
 # creating the flights dataframe, we use rid to reference data in airports to 
 # populate the field aid
-```{r}
+```{r flightsDataframe, eval = TRUE}
 flights_df <- data.frame(`rid` = bds.raw$rid,
   date = bds.raw$flight_date,
                            origin = bds.raw$origin,
@@ -240,9 +245,6 @@ flights_df <- sqldf("SELECT fid,flights_df.rid,`date`,airline,aircraft, altitude
 flights_df
 ```
 
-
-#```
-# changing fid in strikes to fid from flights
 
 # changing fid in strikes to flights' fid
 ```{r}
@@ -303,7 +305,7 @@ strikes_df
 
 
 # populating the strikes table:- 
-```{r}
+```{r papulatingTheStrikesTable, eval = T}
 dbWriteTable(dbcon, "strikes", strikes_df[1:nrow(strikes_df),], row.names = FALSE, append = TRUE)
 ```
 
@@ -336,6 +338,11 @@ SELECT * from airports LIMIT 19
 SELECT * from flights LIMIT 7
 ```
 
+# populating the strikes table:- 
+```{r papulatingTheStrikesTable, eval = T}
+dbWriteTable(dbcon, "strikes", strikes_df[1:nrow(strikes_df),], row.names = FALSE, append = TRUE)
+```
+
 ```{sql connection = dbcon}
 SELECT * from strikes LIMIT 17
 ```
@@ -362,6 +369,7 @@ HAVING num_incidents > (SELECT AVG(num_incidents) FROM (SELECT f.airline, COUNT(
 
 ```
 
+# monthly bird strike
 ```{sql connection=dbcon}
 SELECT DATE_FORMAT(`date`, '%m') AS month, SUM(numbirds) AS total_birds
 FROM strikes AS s
@@ -387,3 +395,98 @@ plot(rs$month, rs$total_birds, type = "l",
 title(main = "Number of Birds vs. Month", sub = "", xlab = "Month", ylab = "Number of Birds")
 
 ```
+
+
+
+
+
+
+# stored procedure
+```{sql connection=dbcon}
+CREATE PROCEDURE AddBirdStrikeSimple(
+    IN p_date DATE,
+    IN p_airline TEXT,
+    IN p_aircraft TEXT,
+    IN p_altitude INTEGER,
+    IN p_heavy BOOLEAN,
+    IN p_num_birds INTEGER,
+    IN p_impact TEXT,
+    IN p_damage BOOLEAN,
+    IN p_sky_condition TEXT
+)
+BEGIN
+    -- Insert the new bird strike incident
+    INSERT INTO strikes (fid, numbirds, impact, damage, altitude, conditions)
+    SELECT
+        f.fid,
+        p_num_birds,
+        p_impact,
+        p_damage,
+        p_altitude,
+        c.cid
+    FROM
+        flights AS f
+    JOIN
+        conditions AS c
+    ON
+        c.sky_condition = p_sky_condition
+    WHERE
+        f.`date` = p_date
+        AND f.airline = p_airline
+        AND f.aircraft = p_aircraft
+        AND f.altitude = p_altitude
+        AND f.heavy = p_heavy;
+```
+
+
+
+
+```{r}
+p_date <- "2023-10-23"
+p_airline <- "Sample Airline"
+p_aircraft <- "Sample Aircraft"
+p_altitude <- 3000
+p_heavy <- TRUE
+p_num_birds <- 5
+p_impact <- "Engine damage"
+p_damage <- TRUE
+p_sky_condition <- "Clear sky"
+
+library(RMySQL)
+
+# Create a connection to your MySQL database
+dbcon <- dbConnect(MySQL(), user = "your_user", password = "your_password", dbname = "your_database")
+
+# Insert or update the flight record and retrieve the flight ID
+query_flight <- sprintf("
+    INSERT INTO flights (`date`, airline, aircraft, altitude, heavy)
+    VALUES ('%s', '%s', '%s', %d, %s)
+    ON DUPLICATE KEY UPDATE fid = LAST_INSERT_ID(fid);
+", p_date, p_airline, p_aircraft, p_altitude, p_heavy)
+dbExecute(dbcon, query_flight)
+
+# Get the flight ID
+query_get_flight_id <- "SELECT LAST_INSERT_ID() AS fid;"
+flight_id <- dbGetQuery(dbcon, query_get_flight_id)$fid
+
+# Insert or update the condition record and retrieve the condition ID
+query_condition <- sprintf("
+    INSERT INTO conditions (sky_condition)
+    VALUES ('%s')
+    ON DUPLICATE KEY UPDATE cid = LAST_INSERT_ID(cid);
+", p_sky_condition)
+dbExecute(dbcon, query_condition)
+
+# Get the condition ID
+query_get_condition_id <- "SELECT LAST_INSERT_ID() AS cid;"
+condition_id <- dbGetQuery(dbcon, query_get_condition_id)$cid
+
+# Insert the new bird strike incident
+query_insert_strike <- sprintf("
+    INSERT INTO strikes (fid, numbirds, impact, damage, altitude, conditions)
+    VALUES (%d, %d, '%s', %s, %d, %d);
+", flight_id, p_num_birds, p_impact, p_damage, p_altitude, condition_id)
+dbExecute(dbcon, query_insert_strike)
+
+```
+
