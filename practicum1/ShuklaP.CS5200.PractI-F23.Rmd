@@ -401,92 +401,75 @@ title(main = "Number of Birds vs. Month", sub = "", xlab = "Month", ylab = "Numb
 
 
 
-# stored procedure
+# Q 12 stored procedure
+# Creating a stored procedure that adds a new incident to the database
+
 ```{sql connection=dbcon}
-CREATE PROCEDURE AddBirdStrikeSimple(
+DROP PROCEDURE IF EXISTS AddBirdStrike
+```
+
+```{sql connection=dbcon}
+
+CREATE PROCEDURE AddBirdStrike(
     IN p_date DATE,
     IN p_airline TEXT,
     IN p_aircraft TEXT,
     IN p_altitude INTEGER,
     IN p_heavy BOOLEAN,
-    IN p_num_birds INTEGER,
+    IN p_numbirds INTEGER,
     IN p_impact TEXT,
     IN p_damage BOOLEAN,
-    IN p_sky_condition TEXT
+    IN p_sky_condition TEXT,
+    IN p_airport_name TEXT,
+    IN p_airport_code TEXT,
+    IN p_airport_state TEXT
 )
 BEGIN
+    DECLARE v_flight_id INT;
+    DECLARE v_condition_id INT;
+    DECLARE v_airport_id INT;
+
+    -- Insert or update the flight record
+    INSERT INTO flights (`date`, airline, aircraft, altitude, heavy)
+    VALUES (p_date, p_airline, p_aircraft, p_altitude, p_heavy)
+    ON DUPLICATE KEY UPDATE fid = LAST_INSERT_ID(fid);
+
+    -- Get the flight ID
+    SELECT LAST_INSERT_ID() INTO v_flight_id;
+
+    -- Insert or update the condition record
+    INSERT INTO conditions (sky_condition)
+    VALUES (p_sky_condition)
+    ON DUPLICATE KEY UPDATE cid = LAST_INSERT_ID(cid);
+
+    -- Get the condition ID
+    SELECT LAST_INSERT_ID() INTO v_condition_id;
+
+    -- Insert or update the airport record
+    INSERT INTO airports (airportName, airportCode, airportState)
+    VALUES (p_airport_name, p_airport_code, p_airport_state)
+    ON DUPLICATE KEY UPDATE aid = LAST_INSERT_ID(aid);
+
+    -- Get the airport ID
+    SELECT LAST_INSERT_ID() INTO v_airport_id;
+
     -- Insert the new bird strike incident
     INSERT INTO strikes (fid, numbirds, impact, damage, altitude, conditions)
-    SELECT
-        f.fid,
-        p_num_birds,
-        p_impact,
-        p_damage,
-        p_altitude,
-        c.cid
-    FROM
-        flights AS f
-    JOIN
-        conditions AS c
-    ON
-        c.sky_condition = p_sky_condition
-    WHERE
-        f.`date` = p_date
-        AND f.airline = p_airline
-        AND f.aircraft = p_aircraft
-        AND f.altitude = p_altitude
-        AND f.heavy = p_heavy;
+    VALUES (v_flight_id, p_numbirds, p_impact, p_damage, p_altitude, v_condition_id);
+
+    -- You can add more code here if needed
+
+END;
+
+```
+```{sql connection = dbcon}
+CALL AddBirdStrike("2023-08-30","lufthansa","FlyUS",10,TRUE,10,"full impact",TRUE,"Sunny","Chaudhry Charan", "123123", "UP")
+```
+# Procedure ran, Sunny is inserted later in the table
+
+```{sql connection=dbcon}
+SELECT * FROM conditions
 ```
 
 
-
-
-```{r}
-p_date <- "2023-10-23"
-p_airline <- "Sample Airline"
-p_aircraft <- "Sample Aircraft"
-p_altitude <- 3000
-p_heavy <- TRUE
-p_num_birds <- 5
-p_impact <- "Engine damage"
-p_damage <- TRUE
-p_sky_condition <- "Clear sky"
-
-library(RMySQL)
-
-# Create a connection to your MySQL database
-dbcon <- dbConnect(MySQL(), user = "your_user", password = "your_password", dbname = "your_database")
-
-# Insert or update the flight record and retrieve the flight ID
-query_flight <- sprintf("
-    INSERT INTO flights (`date`, airline, aircraft, altitude, heavy)
-    VALUES ('%s', '%s', '%s', %d, %s)
-    ON DUPLICATE KEY UPDATE fid = LAST_INSERT_ID(fid);
-", p_date, p_airline, p_aircraft, p_altitude, p_heavy)
-dbExecute(dbcon, query_flight)
-
-# Get the flight ID
-query_get_flight_id <- "SELECT LAST_INSERT_ID() AS fid;"
-flight_id <- dbGetQuery(dbcon, query_get_flight_id)$fid
-
-# Insert or update the condition record and retrieve the condition ID
-query_condition <- sprintf("
-    INSERT INTO conditions (sky_condition)
-    VALUES ('%s')
-    ON DUPLICATE KEY UPDATE cid = LAST_INSERT_ID(cid);
-", p_sky_condition)
-dbExecute(dbcon, query_condition)
-
-# Get the condition ID
-query_get_condition_id <- "SELECT LAST_INSERT_ID() AS cid;"
-condition_id <- dbGetQuery(dbcon, query_get_condition_id)$cid
-
-# Insert the new bird strike incident
-query_insert_strike <- sprintf("
-    INSERT INTO strikes (fid, numbirds, impact, damage, altitude, conditions)
-    VALUES (%d, %d, '%s', %s, %d, %d);
-", flight_id, p_num_birds, p_impact, p_damage, p_altitude, condition_id)
-dbExecute(dbcon, query_insert_strike)
-
-```
 
