@@ -339,6 +339,7 @@ SELECT * from flights LIMIT 7
 ```{sql connection = dbcon}
 SELECT * from strikes LIMIT 17
 ```
+#top 10 states with maximum bird incidents 
 
 ```{sql connection=dbcon}
 SELECT a.airportState, COUNT(s.sid) AS num_incidents
@@ -350,6 +351,7 @@ ORDER BY num_incidents DESC
 LIMIT 10;
 
 ```
+#9 Above average number of bird strikes
 
 ```{sql connection=dbcon}
 SELECT f.airline, COUNT(s.sid) AS num_incidents
@@ -360,5 +362,28 @@ HAVING num_incidents > (SELECT AVG(num_incidents) FROM (SELECT f.airline, COUNT(
 
 ```
 
+```{sql connection=dbcon}
+SELECT DATE_FORMAT(`date`, '%m') AS month, SUM(numbirds) AS total_birds
+FROM strikes AS s
+JOIN flights AS f ON s.fid = f.fid
+GROUP BY month
+LIMIT 6
+```
+#plot graph q 11
+```{r}
+# Execute your SQL query and store the result in a variable
+query <- "SELECT DATE_FORMAT(`date`, '%m') AS month, SUM(numbirds) AS total_birds
+FROM strikes AS s
+JOIN flights AS f ON s.fid = f.fid
+GROUP BY month"
+rs <- dbGetQuery(dbcon, query)
 
+# Create a line plot
+plot(rs$month, rs$total_birds, type = "l", 
+     xlab = "Month", ylab = "Number of Birds",
+     main = "Number of Birds vs. Month")
 
+# Add a title, x-axis label, and y-axis label
+title(main = "Number of Birds vs. Month", sub = "", xlab = "Month", ylab = "Number of Birds")
+
+```
