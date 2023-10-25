@@ -187,6 +187,7 @@ strikes_df
 flights_df <- data.frame(`rid` = bds.raw$rid,
   date = bds.raw$flight_date,
                            origin = bds.raw$origin,
+  airport = bds.raw$airport,
                            airline=bds.raw$airline,
                            aircraft = bds.raw$aircraft, 
                            altitude = bds.raw$altitude_ft,
@@ -229,34 +230,17 @@ sapply(flights_df, function(x) sum(is.na(x)))
 
 # Replacing the origin in flights table with unique id (aid) from airports dataframe
 ```{r}
-flights_df <- sqldf("SELECT fid,flights_df.rid,`date`,airline,aircraft, altitude, heavy, aid AS origin FROM flights_df
-JOIN airport_df ON flights_df.origin = airport_df.airportState")
+flights_df <- sqldf("SELECT fid,flights_df.rid,`date`,airline,aircraft, altitude, heavy, (SELECT aid FROM airport_df WHERE airportState = origin AND airportName = flights_df.airport ) AS origin FROM flights_df")
+                   
+
 
 ```
+
 ```{r}
 flights_df
 ```
 
-```{r}
-num_rows <- nrow(flights_df)
 
-# Create a vector with values from 1 to the number of rows
-new_fid <- 1:num_rows
-
-# Assign the new_fid vector to the fid column in flights_df
-flights_df$fid <- new_fid
-
-
-flights_df
-```
-
-
-#```{r}
-#flights_df <- sqldf("SELECT f.fid,f.rid,f.`date`,f.airline,f.aircraft, f.altitude, f.heavy, a.aid AS origin 
-#FROM flights_df f
-#JOIN airport_df a ON f.rid = a.rid")
-
-#flights_df
 #```
 # changing fid in strikes to fid from flights
 
@@ -270,16 +254,8 @@ strikes_df <- sqldf("
 ```
 
 ```{r}
-num_rows <- nrow(strikes_df)
-
-# Create a vector with values from 1 to the number of rows
-new_sid <- 1:num_rows
-
-# Assign the new_fid vector to the sid column in s
-strikes_df$sid <- new_sid
 strikes_df
 ```
-
 
 
 
@@ -383,17 +359,6 @@ GROUP BY f.airline
 HAVING num_incidents > (SELECT AVG(num_incidents) FROM (SELECT f.airline, COUNT(s.sid) AS num_incidents FROM strikes AS s JOIN flights AS f ON s.fid = f.fid GROUP BY f.airline) AS avg_table);
 
 ```
-```{r}
-query <- sqldf("SELECT DATE_FORMAT(s.incident_date, '%Y-%m') AS month, SUM(s.numbirds) AS total_birds
-          FROM strikes s
-          GROUP BY month
-          ORDER BY month")
-
-# Execute the SQL query and save the result in a dataframe
-bird_strikes_by_month <- dbGetQuery(dbcon, query)
 
 
-# Display the first six rows of the dataframe
-head(bird_strikes_by_month)
-```
 
